@@ -1,79 +1,724 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>我的 AI 助手</title>
-    <style>
-        body { font-family: sans-serif; max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
-        #chat-box { border: 1px solid #ccc; height: 400px; overflow-y: scroll; padding: 1rem; margin-bottom: 1rem; border-radius: 8px; }
-        .message { margin: 10px 0; padding: 10px; border-radius: 5px; }
-        .user { background-color: #e3f2fd; text-align: right; }
-        .ai { background-color: #f1f1f1; }
-        .input-area { display: flex; gap: 10px; }
-        input { flex: 1; padding: 10px; border-radius: 4px; border: 1px solid #ccc; }
-        button { padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:disabled { background-color: #ccc; }
-    </style>
-</head>
-<body>
-
-    <h2>🤖 我的专属 AI 助手</h2>
-    <div id="chat-box"></div>
+    <title>Fei Chen - Digital Architect</title>
     
-    <div class="input-area">
-        <input type="text" id="user-input" placeholder="输入你想问的问题..." />
-        <button onclick="sendMessage()" id="send-btn">发送</button>
-    </div>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18.2.0",
+            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+            "framer-motion": "https://esm.sh/framer-motion@10.16.4?external=react,react-dom",
+            "lucide-react": "https://esm.sh/lucide-react@0.292.0?external=react,react-dom"
+        }
+    }
+    </script>
 
-    <script>
-        async function sendMessage() {
-            const inputField = document.getElementById('user-input');
-            const sendBtn = document.getElementById('send-btn');
-            const chatBox = document.getElementById('chat-box');
-            const text = inputField.value.trim();
-
-            if (!text) return;
-
-            // 1. 显示用户消息
-            appendMessage(text, 'user');
-            inputField.value = '';
-            sendBtn.disabled = true;
-            sendBtn.innerText = "思考中...";
-
-            try {
-                // 2. 发送给我们的后端管家 (不是直接给 Google)
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text })
-                });
-
-                const data = await response.json();
-
-                if (data.error) {
-                    appendMessage("出错了: " + data.error, 'ai');
-                } else {
-                    // 3. 显示 AI 回复
-                    appendMessage(data.reply, 'ai');
-                }
-
-            } catch (err) {
-                appendMessage("网络错误，请稍后再试。", 'ai');
-            } finally {
-                sendBtn.disabled = false;
-                sendBtn.innerText = "发送";
+    <style>
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #050505; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555; 
+        }
+        
+        /* Hide cursor on non-touch devices to use custom cursor */
+        @media (pointer: fine) {
+            body {
+                cursor: none;
+            }
+            a, button, .interactive {
+                cursor: none !important;
             }
         }
+    </style>
+</head>
+<body class="bg-[#050505] text-white overflow-x-hidden selection:bg-white selection:text-black">
+    <div id="root"></div>
 
-        function appendMessage(text, sender) {
-            const chatBox = document.getElementById('chat-box');
-            const div = document.createElement('div');
-            div.classList.add('message', sender);
-            div.innerText = text; // 使用 innerText 防止 XSS 攻击
-            chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect, useRef, useMemo } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { motion, useScroll, useTransform, useSpring, useMotionValue, AnimatePresence } from 'framer-motion';
+        import { ArrowRight, ArrowUpRight, ArrowLeft, X, Send, MessageSquare, Sparkles } from 'lucide-react';
+
+        /* --- Localization Data --- */
+        const translations = {
+          en: {
+            nav: { work: "Work", about: "About", contact: "Contact", talk: "Let's Talk", back: "Back Home" },
+            hero: {
+              title_line1: "DIGITAL",
+              title_line2: "ARCHITECT",
+              desc: "Bridging the gap between physical space and digital experience.",
+              scroll: "Scroll to Explore"
+            },
+            sections: {
+              selected: "Selected Works",
+              about_me: "About Me",
+              trajectory: "Experience",
+              concept: "The Concept",
+            },
+            about_text: "Space is not just a container for life, but an active participant. Transitioning from Interior Design to UX/UI, I construct 'digital architectures'—structures that are as functional as they are beautiful.",
+            footer: {
+              rights: "Fei Chen."
+            },
+            ai: {
+              greeting: "Hello. I am Fei's digital twin. Ask me anything.",
+              placeholder: "Type a question...",
+              wait: "Thinking..."
+            }
+          },
+          zh: {
+            nav: { work: "作品", about: "关于", contact: "联系", talk: "开始对话", back: "返回" },
+            hero: {
+              title_line1: "数字",
+              title_line2: "建筑师",
+              desc: "弥合物理空间与数字体验之间的鸿沟。",
+              scroll: "滑动探索"
+            },
+            sections: {
+              selected: "精选作品",
+              about_me: "关于我",
+              trajectory: "工作经历",
+              concept: "设计理念",
+            },
+            about_text: "空间不仅仅是生活的容器，更是体验的参与者。从室内设计到 UX/UI，我致力于构建“数字建筑”——既具功能性又具美感的结构。",
+            footer: {
+              rights: "Fei Chen."
+            },
+            ai: {
+              greeting: "你好。我是 Fei 的数字分身。请随意提问。",
+              placeholder: "输入问题...",
+              wait: "思考中..."
+            }
+          }
+        };
+
+        /* --- Data --- */
+        const projectsData = [
+          {
+            id: 1,
+            title: { en: "Impression of Yangtze", zh: "长江印象" },
+            category: { en: "Spatial Experience", zh: "空间体验" },
+            year: "2019",
+            location: { en: "Wuhan, China", zh: "中国 武汉" },
+            role: { en: "Lead Designer", zh: "主案设计" },
+            description: { en: "Restaurant renovation blending bamboo aesthetics with structural elements.", zh: "融合竹韵美学与结构元素的餐厅改造。" },
+            color: "from-emerald-900/40"
+          },
+          {
+            id: 2,
+            title: { en: "In Those Years", zh: "那些年" },
+            category: { en: "Brand Space", zh: "品牌空间" },
+            year: "2014",
+            location: { en: "Wuhan, China", zh: "中国 武汉" },
+            role: { en: "Interior Designer", zh: "室内设计师" },
+            description: { en: "Retro-industrial barbecue bar. Exposing raw textures for emotional connection.", zh: "复古工业风烧烤吧。暴露原始肌理以建立情感连接。" },
+            color: "from-orange-900/40"
+          },
+          {
+            id: 3,
+            title: { en: "Green Book", zh: "绿书" },
+            category: { en: "Conceptual", zh: "概念设计" },
+            year: "2017",
+            location: { en: "London, UK", zh: "英国 伦敦" },
+            role: { en: "Concept Artist", zh: "概念设计" },
+            description: { en: "Bookstore concept in Hyde Park. Nature-integrated reading experience.", zh: "海德公园书店概念。自然融合的阅读体验。" },
+            color: "from-green-900/40"
+          },
+          {
+            id: 4,
+            title: { en: "Riverside Impression", zh: "江畔印象" },
+            category: { en: "Hospitality", zh: "酒店设计" },
+            year: "2018",
+            location: { en: "Changsha, China", zh: "中国 长沙" },
+            role: { en: "Design Lead", zh: "设计主管" },
+            description: { en: "Luxury hotel lobby focusing on grand spatial narratives.", zh: "豪华酒店大堂，专注于宏大的空间叙事。" },
+            color: "from-blue-900/40"
+          },
+          {
+            id: 5,
+            title: { en: "Photography & Art", zh: "摄影与艺术" },
+            category: { en: "Visual Arts", zh: "视觉艺术" },
+            year: "2013-2018",
+            location: { en: "Global", zh: "全球" },
+            role: { en: "Photographer", zh: "摄影师" },
+            description: { en: "Composition, light, and texture exploration across cultures.", zh: "跨文化的构图、光线与纹理探索。" },
+            color: "from-purple-900/40"
+          }
+        ];
+
+        const experienceData = [
+          {
+            role: { en: "Interior Designer", zh: "室内设计师" },
+            company: { en: "Hubei Ruijing", zh: "湖北瑞景" },
+            period: "2019 - 2022"
+          },
+          {
+            role: { en: "Design Consultant", zh: "设计顾问" },
+            company: { en: "BuildSimHub Inc.", zh: "BuildSimHub Inc." },
+            period: "2018 - 2019"
+          },
+          {
+            role: { en: "MA Interior Design", zh: "室内设计硕士" },
+            company: { en: "SCAD", zh: "SCAD" },
+            period: "2015 - 2018"
+          }
+        ];
+
+        /* --- Components --- */
+
+        // 1. GLOBAL DYNAMIC BACKGROUND (Applies everywhere)
+        const GlobalBackground = ({ scrollYProgress, mouseX, mouseY }) => {
+          // Parallax effect for the grid
+          const yGrid = useTransform(scrollYProgress, [0, 1], ['0%', '20%']);
+          
+          // Mouse interaction for background glow (Desktop) - Smooth spring animation
+          const glowX = useSpring(mouseX, { stiffness: 50, damping: 25 });
+          const glowY = useSpring(mouseY, { stiffness: 50, damping: 25 });
+
+          // Generate random particles (Memoized to prevent re-render flickering)
+          const particles = useMemo(() => {
+            return [...Array(35)].map((_, i) => ({
+              id: i,
+              left: Math.random() * 100,
+              top: Math.random() * 100,
+              size: Math.random() * 3 + 1,
+              duration: Math.random() * 15 + 10,
+              delay: Math.random() * 10,
+              moveX: Math.random() * 50 - 25
+            }));
+          }, []);
+
+          return (
+            <div className="fixed inset-0 z-[-1] bg-[#050505] overflow-hidden perspective-1000">
+              
+              {/* 1. Interactive Mouse Glow (The "Flashlight") */}
+              <motion.div 
+                className="absolute w-[800px] h-[800px] bg-blue-500/5 rounded-full blur-[150px] pointer-events-none mix-blend-screen hidden md:block"
+                style={{ 
+                  x: glowX, 
+                  y: glowY, 
+                  translateX: '-50%', 
+                  translateY: '-50%' 
+                }}
+              />
+
+              {/* 2. Floating Particles (The "Digital Dust") */}
+              <div className="absolute inset-0 pointer-events-none">
+                {particles.map((p) => (
+                  <motion.div
+                    key={p.id}
+                    className="absolute bg-white/30 rounded-full"
+                    style={{
+                      left: `${p.left}%`,
+                      top: `${p.top}%`,
+                      width: p.size,
+                      height: p.size,
+                    }}
+                    animate={{
+                      y: [0, -150],
+                      x: [0, p.moveX],
+                      opacity: [0, 0.6, 0],
+                    }}
+                    transition={{
+                      duration: p.duration,
+                      repeat: Infinity,
+                      ease: "linear",
+                      delay: p.delay,
+                    }}
+                  />
+                ))}
+              </div>
+
+              {/* 3. Base Gradient Mesh (The Nebula - Enhanced) */}
+              <div className="absolute inset-0 opacity-60">
+                <motion.div 
+                  animate={{ 
+                    scale: [1, 1.2, 1], 
+                    rotate: [0, 45, 0], 
+                    opacity: [0.3, 0.5, 0.3] 
+                  }}
+                  transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+                  className="absolute top-[-20%] left-[-10%] w-[90vw] h-[90vw] bg-gradient-to-br from-blue-900/20 to-purple-900/20 rounded-full blur-[150px] mix-blend-screen"
+                />
+                <motion.div 
+                  animate={{ 
+                    scale: [1, 1.5, 1], 
+                    x: [0, 100, 0], 
+                    opacity: [0.2, 0.4, 0.2] 
+                  }}
+                  transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
+                  className="absolute bottom-[-20%] right-[-10%] w-[80vw] h-[80vw] bg-indigo-900/20 rounded-full blur-[150px] mix-blend-screen"
+                />
+              </div>
+
+              {/* 4. Architectural Grid with Parallax & Pulse */}
+              <motion.div 
+                style={{ y: yGrid }}
+                animate={{ opacity: [0.05, 0.12, 0.05] }}
+                transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute inset-[-50%]"
+              >
+                 <div 
+                  className="w-full h-full"
+                  style={{
+                    backgroundImage: `linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)`,
+                    backgroundSize: '100px 100px'
+                  }}
+                 />
+              </motion.div>
+
+              {/* 5. Global Noise Texture */}
+              <div className="absolute inset-0 opacity-[0.05] pointer-events-none mix-blend-overlay" 
+                   style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.8\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\' opacity=\'1\'/%3E%3C/svg%3E")' }} 
+              />
+            </div>
+          );
+        };
+
+        // 2. Interactive Cursor (Hidden on touch devices)
+        const CustomCursor = () => {
+          const mouseX = useMotionValue(-100);
+          const mouseY = useMotionValue(-100);
+          const springConfig = { damping: 20, stiffness: 400 };
+          const cursorX = useSpring(mouseX, springConfig);
+          const cursorY = useSpring(mouseY, springConfig);
+          const [hoverState, setHoverState] = useState('default');
+
+          useEffect(() => {
+            // Only enable custom cursor on non-touch devices
+            if (typeof window !== 'undefined' && window.matchMedia("(pointer: fine)").matches) {
+                const moveCursor = (e) => { mouseX.set(e.clientX); mouseY.set(e.clientY); };
+                const handleMouseOver = (e) => {
+                  const target = e.target;
+                  if (target.tagName === 'A' || target.tagName === 'BUTTON' || target.closest('.interactive')) {
+                    setHoverState('pointer');
+                  } else {
+                    setHoverState('default');
+                  }
+                };
+                window.addEventListener('mousemove', moveCursor);
+                window.addEventListener('mouseover', handleMouseOver);
+                return () => { window.removeEventListener('mousemove', moveCursor); window.removeEventListener('mouseover', handleMouseOver); };
+            }
+          }, []);
+
+          return (
+            <div className="hidden md:block pointer-events-none z-[60]">
+              <motion.div className="fixed top-0 left-0 w-3 h-3 bg-white rounded-full mix-blend-difference" style={{ x: cursorX, y: cursorY, translateX: '-50%', translateY: '-50%' }} />
+              <motion.div className="fixed top-0 left-0 w-10 h-10 border border-white rounded-full mix-blend-difference" style={{ x: cursorX, y: cursorY, translateX: '-50%', translateY: '-50%' }} animate={{ scale: hoverState === 'pointer' ? 1.5 : 1 }} transition={{ duration: 0.2 }} />
+            </div>
+          );
+        };
+
+        // 3. Placeholder Art
+        const PlaceholderArt = ({ className }) => (
+          <div className={`w-full h-full bg-[#111] relative overflow-hidden ${className}`}>
+             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.05),transparent_70%)]" />
+             <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+             <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1/2 h-1/2 border border-white/20 rounded-full flex items-center justify-center`}>
+                <div className="w-2/3 h-2/3 border border-white/10 rotate-45" />
+             </div>
+          </div>
+        );
+
+        // 4. Project List Item
+        const ProjectListItem = ({ project, lang, index, setHoveredProject, openProject }) => {
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: index * 0.05 }}
+              onMouseEnter={() => setHoveredProject(project)}
+              onMouseLeave={() => setHoveredProject(null)}
+              onClick={() => openProject(project)}
+              className="group relative border-t border-white/10 py-8 md:py-12 cursor-pointer interactive overflow-hidden"
+            >
+              <div className="container mx-auto px-6 md:px-12 flex justify-between items-center md:items-baseline relative z-10">
+                <div className="flex flex-col md:flex-row md:items-baseline gap-2 md:gap-12 transition-transform duration-500 md:group-hover:translate-x-4">
+                  <span className="text-[12px] md:text-sm font-sans font-medium text-gray-400">0{index + 1}</span>
+                  <h3 className="text-2xl md:text-5xl font-bold uppercase tracking-tight text-white md:group-hover:text-transparent md:group-hover:bg-clip-text md:group-hover:bg-gradient-to-r md:group-hover:from-white md:group-hover:to-gray-400 transition-all">
+                    {project.title[lang]}
+                  </h3>
+                </div>
+                
+                <div className="hidden md:flex flex-col items-end text-right transition-transform duration-500 group-hover:-translate-x-4">
+                  <span className="text-base font-sans text-gray-300 font-medium">{project.category[lang]}</span>
+                  <span className="text-sm text-gray-400 mt-1">{project.year}</span>
+                </div>
+
+                <ArrowUpRight className="md:hidden w-5 h-5 text-gray-400" />
+              </div>
+              
+              <motion.div className="hidden md:block absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+            </motion.div>
+          );
+        };
+
+        // 5. Floating Image Preview (Hidden on Mobile)
+        const FloatingPreview = ({ hoveredProject, mousePos }) => {
+          if (!hoveredProject) return null;
+          return (
+            <motion.div
+              className="fixed pointer-events-none z-20 hidden md:block overflow-hidden"
+              style={{ top: 0, left: 0, x: mousePos.x, y: mousePos.y }}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1, x: mousePos.x.get() + 20, y: mousePos.y.get() - 150 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ type: "spring", stiffness: 150, damping: 15 }}
+            >
+              <div className="w-[400px] h-[250px] bg-[#1a1a1a]/80 backdrop-blur-md rounded-lg overflow-hidden border border-white/10 shadow-2xl relative">
+                <PlaceholderArt />
+                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
+                      <p className="text-white font-sans text-sm uppercase tracking-widest font-bold">{hoveredProject.year}</p>
+                </div>
+              </div>
+            </motion.div>
+          );
+        };
+
+        /* --- AI Chat --- */
+        const AIChatBot = ({ lang }) => {
+          const t = translations[lang].ai;
+          const [isOpen, setIsOpen] = useState(false);
+          const [messages, setMessages] = useState([]); 
+          const [inputText, setInputText] = useState('');
+          const [isLoading, setIsLoading] = useState(false);
+          const messagesEndRef = useRef(null);
+
+          useEffect(() => { setMessages([{ role: 'assistant', text: t.greeting }]); }, [lang]);
+
+          useEffect(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+          }, [messages]);
+
+          const systemPrompt = `
+            You are Fei Chen, a UX/UI and Spatial Designer.
+            Resume Context:
+            - Role: UX/UI Designer & Spatial Designer, Oakton, VA.
+            - Education: SCAD (MA Interior Design, 4.0 GPA).
+            - Experience: Interior Designer & 3D Specialist at Hubei Ruijing (2019-2022).
+            - Projects: Impression of Yangtze, In Those Years, Green Book.
+            - Skills: Revit, 3ds Max, V-Ray, Adobe Creative Suite.
+            Rule: Reply in the user's language (English or Chinese).
+          `;
+
+          const handleSendMessage = async () => {
+            if (!inputText.trim()) return;
+            
+            const userMsg = { role: 'user', text: inputText };
+            setMessages(prev => [...prev, userMsg]);
+            setInputText('');
+            setIsLoading(true);
+
+            try {
+              // --- CHANGED: Using our Vercel Backend (The Butler) ---
+              // We construct a full prompt to maintain the Persona even with the simple backend
+              const fullPrompt = systemPrompt + "\n\nUser Question: " + inputText;
+
+              const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: fullPrompt }) 
+              });
+
+              const data = await response.json();
+
+              if (data.error) throw new Error(data.error);
+              
+              setMessages(prev => [...prev, { role: 'assistant', text: data.reply }]);
+            
+            } catch (error) {
+              console.error(error);
+              setMessages(prev => [...prev, { role: 'assistant', text: "Network error. Please try again." }]);
+            } finally {
+              setIsLoading(false);
+            }
+          };
+
+          return (
+            <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end font-sans">
+              <AnimatePresence>
+                {isOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 20, scale: 0.9 }}
+                    className="mb-4 w-[90vw] md:w-[350px] h-[50vh] md:h-[500px] bg-[#0f0f0f]/95 backdrop-blur-xl border border-white/20 shadow-2xl overflow-hidden rounded-xl flex flex-col"
+                  >
+                    <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5 shrink-0">
+                      <span className="text-xs font-bold uppercase tracking-widest text-gray-300">Fei</span>
+                      <button onClick={() => setIsOpen(false)}><X className="w-5 h-5 text-white" /></button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-white/10">
+                      {messages.map((msg, idx) => (
+                        <div key={idx} className={`text-base leading-relaxed ${msg.role === 'user' ? 'text-right text-white' : 'text-left text-gray-200'}`}>
+                          <span className={`inline-block p-3 rounded-lg max-w-[85%] ${msg.role === 'user' ? 'bg-blue-900/30 border border-blue-500/30' : 'bg-white/5 border border-white/10'}`}>
+                            {msg.text}
+                          </span>
+                        </div>
+                      ))}
+                      {isLoading && <div className="text-sm text-gray-400 animate-pulse">{t.wait}</div>}
+                      <div ref={messagesEndRef} />
+                    </div>
+                    <div className="p-4 border-t border-white/10 flex gap-2 shrink-0 bg-black/40">
+                      <input
+                        className="bg-transparent text-base text-white flex-1 outline-none placeholder:text-gray-500"
+                        placeholder={t.placeholder}
+                        value={inputText}
+                        onChange={(e) => setInputText(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                      />
+                      <button onClick={handleSendMessage}><Send className="w-4 h-4 text-white" /></button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-12 h-12 md:w-14 md:h-14 border border-white/20 flex items-center justify-center bg-black/50 backdrop-blur-md hover:bg-white hover:text-black transition-colors interactive rounded-full shadow-lg"
+              >
+                {isOpen ? <X className="w-5 h-5" /> : <MessageSquare className="w-5 h-5" />}
+              </button>
+            </div>
+          );
+        };
+
+        /* --- Project Detail View (Slide Over with Transparency) --- */
+        const ProjectDetail = ({ project, lang, onClose }) => {
+          const t = translations[lang].sections;
+
+          useEffect(() => {
+            document.body.style.overflow = 'hidden';
+            return () => { document.body.style.overflow = 'unset'; };
+          }, []);
+
+          return (
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed inset-0 z-50 bg-[#0a0a0a]/95 md:bg-[#0a0a0a]/85 backdrop-blur-xl md:backdrop-blur-2xl overflow-y-auto"
+            >
+              <div className="container mx-auto px-6 md:px-12 py-8 md:py-12 relative z-10">
+                <div className="flex justify-between items-center mb-12 md:mb-20">
+                    <button onClick={onClose} className="text-sm font-sans font-bold uppercase tracking-widest text-gray-300 hover:text-white flex items-center gap-2 interactive">
+                        <ArrowLeft className="w-4 h-4" /> {translations[lang].nav.back}
+                    </button>
+                    <span className="text-sm font-sans font-medium text-gray-400">{project.year} — {project.category[lang]}</span>
+                </div>
+
+                <motion.h1 
+                    initial={{ opacity: 0, y: 50 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="text-4xl md:text-6xl lg:text-8xl font-bold uppercase leading-[1.1] mb-8 md:mb-12 tracking-tight"
+                >
+                    {project.title[lang]}
+                </motion.h1>
+
+                <div className="w-full aspect-video bg-[#111]/50 mb-12 md:mb-20 relative overflow-hidden border border-white/10 rounded-lg">
+                    <PlaceholderArt className="opacity-50" />
+                    <div className={`absolute inset-0 bg-gradient-to-t ${project.color} to-transparent opacity-20`} />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12 mb-20 md:mb-32">
+                    <div className="md:col-span-4 space-y-6 md:space-y-8 font-sans text-sm md:text-base border-t border-white/10 pt-6 md:pt-8">
+                        <div><span className="text-gray-400 font-bold block mb-2">Role</span>{project.role[lang]}</div>
+                        <div><span className="text-gray-400 font-bold block mb-2">Location</span>{project.location[lang]}</div>
+                    </div>
+                    <div className="md:col-span-8 border-t border-white/10 pt-6 md:pt-8">
+                        <p className="text-lg md:text-2xl font-normal leading-relaxed text-gray-100">
+                            {project.description[lang]}
+                        </p>
+                        <div className="mt-8 md:mt-12 p-6 md:p-8 bg-white/5 border border-white/5 backdrop-blur-md rounded-lg">
+                            <h3 className="font-sans text-sm font-bold uppercase text-gray-400 mb-4">{t.concept}</h3>
+                            <p className="text-base md:text-lg text-gray-200 leading-relaxed">
+                                Design is not just about how it looks, but how it works. For this project, we explored the boundaries of {project.category[lang]}. The spatial dynamics were carefully calculated to enhance the user journey, ensuring every corner tells a part of the story.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div className="border-t border-white/20 py-12 md:py-20 text-center">
+                    <span className="font-sans text-sm font-bold text-gray-400 mb-4 block">Next Project</span>
+                    <button onClick={onClose} className="text-3xl md:text-5xl font-bold hover:text-transparent hover:bg-clip-text hover:bg-gradient-to-r hover:from-blue-400 hover:to-purple-600 transition-all interactive">
+                        View All Works
+                    </button>
+                </div>
+              </div>
+            </motion.div>
+          );
+        };
+
+        /* --- Main App --- */
+        const App = () => {
+          const [lang, setLang] = useState('en');
+          const [selectedProject, setSelectedProject] = useState(null);
+          const [hoveredProject, setHoveredProject] = useState(null);
+          const [scrolled, setScrolled] = useState(false);
+          const mouseX = useMotionValue(0);
+          const mouseY = useMotionValue(0);
+          const { scrollYProgress } = useScroll();
+          
+          useEffect(() => {
+            // Only track mouse on desktops
+            if (typeof window !== 'undefined' && window.matchMedia("(pointer: fine)").matches) {
+                const handleMouseMove = (e) => { mouseX.set(e.clientX); mouseY.set(e.clientY); };
+                window.addEventListener('mousemove', handleMouseMove);
+                return () => window.removeEventListener('mousemove', handleMouseMove);
+            }
+          }, []);
+
+          useEffect(() => {
+            const handleScroll = () => {
+              setScrolled(window.scrollY > 20);
+              if (hoveredProject) {
+                setHoveredProject(null);
+              }
+            };
+            window.addEventListener('scroll', handleScroll);
+            return () => window.removeEventListener('scroll', handleScroll);
+          }, [hoveredProject]);
+
+          const t = translations[lang];
+
+          return (
+            <div className="min-h-screen text-white font-sans selection:bg-white selection:text-black overflow-x-hidden relative">
+              <CustomCursor />
+              <GlobalBackground scrollYProgress={scrollYProgress} mouseX={mouseX} mouseY={mouseY} />
+              <AIChatBot lang={lang} />
+              
+              <AnimatePresence>
+                {hoveredProject && <FloatingPreview hoveredProject={hoveredProject} mousePos={{x: mouseX, y: mouseY}} />}
+              </AnimatePresence>
+              
+              <AnimatePresence>
+                {selectedProject && <ProjectDetail project={selectedProject} lang={lang} onClose={() => setSelectedProject(null)} />}
+              </AnimatePresence>
+
+              {/* Navigation */}
+              <nav 
+                className={`fixed top-0 w-full z-40 px-6 md:px-12 transition-all duration-300 flex justify-between items-center md:items-start text-white border-b ${
+                  scrolled 
+                    ? 'py-4 bg-[#050505]/80 backdrop-blur-md border-white/10' 
+                    : 'py-6 md:py-8 border-transparent'
+                }`}
+              >
+                <div className="text-lg font-bold tracking-tighter interactive cursor-pointer">FEI CHEN.</div>
+                <div className="flex gap-4 md:gap-8 items-center md:items-start">
+                    <div className="hidden md:flex flex-col text-right gap-1 font-sans text-sm font-medium text-gray-300">
+                        <a href="#work" className="hover:text-white interactive uppercase">Works</a>
+                        <a href="#about" className="hover:text-white interactive uppercase">Profile</a>
+                        <a href="#contact" className="hover:text-white interactive uppercase">Contact</a>
+                    </div>
+                    <button onClick={() => setLang(lang === 'en' ? 'zh' : 'en')} className="font-sans font-bold text-xs border border-white/20 px-3 py-1 rounded-full hover:bg-white hover:text-black transition-colors interactive">{lang === 'en' ? 'EN' : '中'}</button>
+                </div>
+              </nav>
+
+              {/* Hero Section */}
+              <section className="min-h-screen flex flex-col justify-center px-6 md:px-12 pt-24 md:pt-32 relative">
+                 <div className="max-w-full md:max-w-[90vw]">
+                     <motion.h1 
+                        initial={{ opacity: 0, y: 100 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+                        className="text-6xl md:text-[10vw] leading-[0.9] font-bold tracking-tight uppercase mix-blend-difference"
+                      >
+                        {t.hero.title_line1} <br/>
+                        <span className="text-gray-400">{t.hero.title_line2}</span>
+                      </motion.h1>
+                 </div>
+                 <div className="mt-12 md:mt-20 flex flex-col md:flex-row justify-between items-start md:items-end border-t border-white/10 pt-6">
+                    <p className="max-w-md text-gray-300 text-base md:text-lg leading-relaxed font-normal">{t.hero.desc}</p>
+                    <div className="mt-8 md:mt-0 flex items-center gap-2 text-sm font-bold uppercase text-gray-400 animate-pulse">
+                        <ArrowRight className="w-4 h-4 rotate-90" /> {t.hero.scroll}
+                    </div>
+                 </div>
+              </section>
+
+              {/* Works List */}
+              <section id="work" className="py-20 md:py-32">
+                <div className="px-6 md:px-12 mb-8 md:mb-12 flex items-baseline justify-between">
+                     <h2 className="text-sm font-bold uppercase text-gray-400 tracking-widest">{t.sections.selected}</h2>
+                     <span className="text-sm font-medium text-gray-400">05 Projects</span>
+                </div>
+                <div>{projectsData.map((project, index) => (<ProjectListItem key={project.id} project={project} index={index} lang={lang} setHoveredProject={setHoveredProject} openProject={setSelectedProject} />))}</div>
+              </section>
+
+              {/* About */}
+              <section id="about" className="py-20 md:py-32 px-6 md:px-12 border-t border-white/10 relative z-10">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-12">
+                    <div className="md:col-span-4">
+                        <h2 className="text-sm font-bold uppercase text-gray-400 tracking-widest mb-6 md:mb-8">{t.sections.about_me}</h2>
+                        <div className="w-16 md:w-24 h-1 bg-white mb-6 md:mb-8" />
+                    </div>
+                    <div className="md:col-span-8">
+                        <p className="text-xl md:text-3xl font-normal leading-relaxed mb-12 md:mb-20 text-gray-200">{t.about_text}</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                            <div>
+                                <h3 className="text-sm font-bold uppercase text-gray-400 mb-6">{t.sections.trajectory}</h3>
+                                <ul className="space-y-6">
+                                    {experienceData.map((exp, i) => (
+                                        <li key={i} className="flex flex-col pb-6 border-b border-white/10">
+                                            <span className="text-lg md:text-xl font-bold text-white">{exp.role[lang]}</span>
+                                            <span className="text-gray-300 text-sm md:text-base mt-1">{exp.company[lang]}</span>
+                                            <span className="text-gray-400 text-sm font-medium mt-1">{exp.period}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold uppercase text-gray-400 mb-6">Services</h3>
+                                <div className="flex flex-wrap gap-2 md:gap-3">
+                                    {['UX/UI Design', 'Interior Architecture', '3D Visualization', 'Art Direction'].map(s => (<span key={s} className="px-4 py-2 border border-white/20 rounded-full text-sm font-medium text-gray-200 hover:bg-white hover:text-black transition-colors cursor-default">{s}</span>))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+              </section>
+
+              {/* Footer */}
+              <section id="contact" className="min-h-[40vh] md:min-h-[50vh] flex flex-col justify-between px-6 md:px-12 py-12 border-t border-white/10 relative z-10">
+                 <div className="mb-12 md:mb-0">
+                     <h2 className="text-sm font-bold uppercase text-gray-400 tracking-widest mb-4">{t.nav.contact}</h2>
+                     <a href="mailto:chf88620@gmail.com" className="text-4xl md:text-7xl font-bold tracking-tight hover:text-gray-300 transition-colors interactive break-all md:break-normal">LET'S TALK</a>
+                 </div>
+                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 relative z-10">
+                     <div className="flex gap-6 font-sans text-sm font-bold text-gray-300">
+                         <a href="#" className="hover:text-white interactive">LinkedIn</a>
+                         <a href="#" className="hover:text-white interactive">Instagram</a>
+                     </div>
+                     <div className="text-left md:text-right">
+                         <p className="text-sm text-gray-400 font-medium">Oakton, VA • EST</p>
+                         <p className="text-sm text-gray-400 font-medium mt-1">© 2024 {t.footer.rights}</p>
+                     </div>
+                 </div>
+              </section>
+            </div>
+          );
+        };
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
