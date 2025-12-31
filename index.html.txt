@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的 AI 助手</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
+        #chat-box { border: 1px solid #ccc; height: 400px; overflow-y: scroll; padding: 1rem; margin-bottom: 1rem; border-radius: 8px; }
+        .message { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .user { background-color: #e3f2fd; text-align: right; }
+        .ai { background-color: #f1f1f1; }
+        .input-area { display: flex; gap: 10px; }
+        input { flex: 1; padding: 10px; border-radius: 4px; border: 1px solid #ccc; }
+        button { padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:disabled { background-color: #ccc; }
+    </style>
+</head>
+<body>
+
+    <h2>🤖 我的专属 AI 助手</h2>
+    <div id="chat-box"></div>
+    
+    <div class="input-area">
+        <input type="text" id="user-input" placeholder="输入你想问的问题..." />
+        <button onclick="sendMessage()" id="send-btn">发送</button>
+    </div>
+
+    <script>
+        async function sendMessage() {
+            const inputField = document.getElementById('user-input');
+            const sendBtn = document.getElementById('send-btn');
+            const chatBox = document.getElementById('chat-box');
+            const text = inputField.value.trim();
+
+            if (!text) return;
+
+            // 1. 显示用户消息
+            appendMessage(text, 'user');
+            inputField.value = '';
+            sendBtn.disabled = true;
+            sendBtn.innerText = "思考中...";
+
+            try {
+                // 2. 发送给我们的后端管家 (不是直接给 Google)
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    appendMessage("出错了: " + data.error, 'ai');
+                } else {
+                    // 3. 显示 AI 回复
+                    appendMessage(data.reply, 'ai');
+                }
+
+            } catch (err) {
+                appendMessage("网络错误，请稍后再试。", 'ai');
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.innerText = "发送";
+            }
+        }
+
+        function appendMessage(text, sender) {
+            const chatBox = document.getElementById('chat-box');
+            const div = document.createElement('div');
+            div.classList.add('message', sender);
+            div.innerText = text; // 使用 innerText 防止 XSS 攻击
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+</body>
+</html>
