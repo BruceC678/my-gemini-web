@@ -5,6 +5,6 @@
   "main": "api/chat.js",
   "dependencies": {},
   "engines": {
-    "node": "18.x"
+    "node": "24.x"
   }
 }
